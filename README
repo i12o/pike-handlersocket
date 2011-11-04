@@ -1,0 +1,76 @@
+* Pike HanlderSocket module
+
+This is pure pike client library to communicate with MySQL HandlerSocket
+server.
+
+
+HandlerSocket is NoSQL plugin for MySQL.
+
+  https://github.com/ahiguti/HandlerSocket-Plugin-for-MySQL
+
+It enables you to retrieve record from MySQL table, bypassing SQL
+parser of MySQL.  This gives faster accessing method for MySQL records.
+
+
+With this module, you can do these operations from pike.
+
+  * Connect to HandlerSocket
+  * Open table
+  * Fetch records from table using already existing MySQL index.
+  * Update/delete records through same condition of fetching.
+  * Insert new record to table.
+
+ToDo:
+
+  * Better error checking.
+  * Better, high level interface to HandlerSocket
+  * auth protcol support
+
+
+Below is sample code of fetching:
+
+----x8--------x8--------x8--------x8--------x8--------x8--------x8----
+#!/usr/bin/pike
+
+int main() {
+  // Readonly connection to MYSQLHOST's HandlerSocket port.
+	object hs = .HandlerSocket("MYSQLHOST",9998);
+	if (!hs) {
+		werror("Can't open\n");
+		return 1;
+	}
+  // Open MYSQLDBNAME.TABLENAME table, which has columns
+  //   pkey, col1, col2, and col3
+  // at least.
+  // This table has pkey as PRIMARY KEY.
+  //
+  // OpenIndex below is similar to
+  //   SELECT pkey,col1,col2 FROM TABLENAME
+  //   WHERE pkey=? AND SOMECONDITION_FOR(col3)
+  //
+	object oid = hs->OpenIndex(([
+		                           "dbname" : "MYSQLDBNAME",
+		                           "tablename" : "TABLENAME",
+		                           "columns" : ({"pkey","col1","col2"}),
+		                           "fcolumns": ({"col3"}),
+	                           ]));
+	if (!oid) {
+		werror("Can't open index\n");
+		return 1;
+	}
+
+  // Fetch tuples from TABLENAME, like:
+  //   SELECT pkey,col1,col2 FROM TABLENAME
+  //   WHERE pkey < 'foobar-123'
+  //     AND col3 = 2
+  //   LIMIT 100, OFFSET 0;
+	array res = oid->execute_find("<",({"foobar-123"}),({100,0}),0,
+	                              (["type":"F","op":"=","col":0,"val":"2"]));
+	if (res) {
+		foreach(res;;array r) {
+			write("%s\n",r*"\t");
+		}
+	} else {
+		werror("Response error\n");
+	}
+}
